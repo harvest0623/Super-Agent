@@ -3,10 +3,23 @@ import { streamText, type ModelMessage, stepCountIs } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createMockModel } from './mock-model.js'
 import { createInterface } from 'readline'
-import { weatherTool } from './tools/utility-tools.js'
+// import { weatherTool } from './tools/utility-tools.js'
+import { allTools } from './tools/tools.js'
+import { ToolRegistry } from './tools/tool-registry.js'
 import { agentLoop, type BudgetState } from './agent/loop.js'
 
-const tools = { get_weather: weatherTool }
+// const tools = { get_weather: weatherTool }
+const registry = new ToolRegistry();
+registry.register(...allTools);
+console.log(`已注册: ${registry.getAll().length} 个工具`);
+for (const tool of registry.getAll()) {
+    const flags = [
+        tool.isConcurrencySafe ? '可并发' : '串行',
+        tool.isReadOnly ? '只读' : '读写',
+    ].join(', ');
+    console.log(` -- ${tool.name}: ${flags}`);
+}
+
 const messages: ModelMessage[] = []
 const rl = createInterface({  // 创建 readline 接口, 用于从命令行读取用户输入
     input: process.stdin,
@@ -77,9 +90,13 @@ const model = process.env.DASHSCOPE_API_KEY ? qwen.chat('qwen3.8-27b') : createM
 //     });
 // }
 
-const budget: BudgetState = {used: 0, limit: 15000}  // token 预算
+const budget: BudgetState = { used: 0, limit: 15000 }  // token 预算
 
-const system = '你是 Super Agent，一个有工具调用能力的 AI 助手。需要时主动使用工具获取信息，不要编造数据。'
+const SYSTEM = `你是 Super Agent，一个有工具调用能力的 AI 助手。
+你有以下工具可用：get_weather, calculator, read_file, write_file, list_directory。
+需要查询信息或操作文件时，主动使用工具，不要编造数据。
+可以同时调用多个互不冲突的工具来提高效率。
+回答要简洁直接。`;
 
 function ask() {
     rl.question('\nYou: ', async (input) => {
@@ -92,9 +109,9 @@ function ask() {
 
         messages.push({ role: 'user', content: trimmed });
 
-        await agentLoop(model, tools, messages, system, budget)
+        await agentLoop(model, registry, messages, SYSTEM, budget);
 
-        ask()
+        ask();
     });
 }
 
