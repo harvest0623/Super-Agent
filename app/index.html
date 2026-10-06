@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>待办事项应用</title>
+    <link rel="stylesheet" href="./styles.css" />
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>📝 待办事项</h1>
+            <p>管理你的日常任务</p>
+        </header>
+
+        <div class="input-group">
+            <input type="text" id="todo-input" placeholder="输入新任务..." />
+            <button id="add-btn">添加</button>
+        </div>
+
+        <div class="filter-buttons">
+            <button class="filter-btn active" data-filter="all">全部</button>
+            <button class="filter-btn" data-filter="active">进行中</button>
+            <button class="filter-btn" data-filter="completed">已完成</button>
+        </div>
+
+        <div class="todo-list" id="todo-list">
+            <!-- 待办事项将在这里动态生成 -->
+        </div>
+
+        <div class="stats">
+            <span id="todo-count">0 项待办</span>
+            <button id="clear-completed">清除已完成</button>
+        </div>
+    </div>
+    <script src="./main.js" defer></script>
+</body>
+</html>
