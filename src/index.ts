@@ -93,7 +93,7 @@ const model = process.env.DASHSCOPE_API_KEY ? qwen.chat('qwen3.8-27b') : createM
 const budget: BudgetState = { used: 0, limit: 15000 }  // token 预算
 
 const SYSTEM = `你是 Super Agent，一个有工具调用能力的 AI 助手。
-你有以下工具可用：get_weather, calculator, read_file, write_file, list_directory。
+你有以下工具可用：get_weather, calculator, read_file, write_file, list_directory, editFileTool, globTool, grepTool, bashTool。
 需要查询信息或操作文件时，主动使用工具，不要编造数据。
 可以同时调用多个互不冲突的工具来提高效率。
 回答要简洁直接。`;
