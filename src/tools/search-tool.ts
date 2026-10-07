@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "./tool-registry.js";
+import TurndownService from 'turndown';
 
 // Tavily 搜索引擎
 export const tavilySearchTool: ToolDefinition = {
@@ -106,10 +107,48 @@ export const serperSearchTool: ToolDefinition = {
             lines.push(r.snippet || '');
             lines.push('');
         }
-
         return lines.join('\n') || '没有找到相关结果';
     },
 };
+
+// 为 Serper 搜索引擎添加web_fetch
+export const webFetchTool: ToolDefinition = {
+    name: 'web_fetch',
+    description: '抓取指定 URL 的网页内容，转换为 Markdown 格式',
+    parameters: {
+        type: 'object',
+        properties: {
+            url: { type: 'string', description: '完整 URL' },
+        },
+        required: ['url'],
+    },
+    isConcurrencySafe: true,
+    isReadOnly: true,
+    maxResultChars: 3000,
+    execute: async ({ url }: { url: string }) => {
+        try {
+            const res = await fetch(url, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SuperAgent/1.0)' },
+                signal: AbortSignal.timeout(15000),
+            });
+            if (!res.ok) return `抓取失败: HTTP ${res.status}`;
+            const html = await res.text();
+            return htmlToMarkdown(html);
+        } catch (err: any) {
+            return `抓取失败: ${err.message}`;
+        }
+    },
+};
+// HTML 转换为 Markdown 格式
+const turndownService = new TurndownService({
+    headingStyle: 'atx',
+    codeBlockStyle: 'fenced',
+});
+
+turndownService.remove(['style', 'script', 'header', 'nav', 'footer', 'iframe']);
+function htmlToMarkdown(html: string) {
+    return turndownService.turndown(html);
+}
 
 export function pickSearchTool(): ToolDefinition {
     if (process.env.TAVILY_API_KEY) return tavilySearchTool;

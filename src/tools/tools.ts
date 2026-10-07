@@ -4,7 +4,7 @@ import type { ToolDefinition } from './tool-registry.js'
 import fg from 'fast-glob'
 import { execSync } from 'node:child_process'
 import { createServer, type Server } from 'node:http'
-import { pickSearchTool } from './search-tool.js'
+import { pickSearchTool, webFetchTool } from './search-tool.js'
 
 export const readFileTool: ToolDefinition = {
     name: 'read_file',
@@ -396,5 +396,6 @@ export const allTools: ToolDefinition[] = [
     bashTool,
     fetchUrlTool,
     startPreviewTool,
-    pickSearchTool()
+    pickSearchTool(),
+    webFetchTool
 ];
