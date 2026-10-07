@@ -1,0 +1,4 @@
+{"type":"message","timestamp":"2026-08-31T09:15:58.010Z","message":{"role":"user","content":"你好"}}
+{"type":"message","timestamp":"2026-08-31T09:16:00.216Z","message":{"role":"assistant","content":[{"type":"text","text":"你好！我是 Super Agent，有什么可以帮你的吗？"}]}}
+{"type":"message","timestamp":"2026-08-31T09:16:20.353Z","message":{"role":"user","content":"你是谁?"}}
+{"type":"message","timestamp":"2026-08-31T09:16:25.150Z","message":{"role":"assistant","content":[{"type":"text","text":"我是千问（Qwen），由阿里巴巴集团自主研发的大语言模型，现在作为你的 AI 助手，可以帮你回答问题、分析资料、操作文件，以及调用 GitHub、网络搜索等各类工具来完成任务。有什么需要我帮忙的吗？"}]}}

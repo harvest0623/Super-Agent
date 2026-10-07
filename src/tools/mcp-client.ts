@@ -27,7 +27,13 @@ export class MCPClient {
     }
 
     async connect(): Promise<void> {
-        this.process = spawn(this.command, this.args, {
+        // Windows 上命令是 .cmd/.exe 文件，spawn 无法直接启动（报 ENOENT/EINVAL），
+        // 需要显式用 cmd.exe /c 包装；Linux/macOS 直接 spawn 即可。
+        const isWindows = process.platform === 'win32';
+        const command = isWindows ? 'cmd.exe' : this.command;
+        const args = isWindows ? ['/c', this.command, ...this.args] : this.args;
+
+        this.process = spawn(command, args, {
             stdio: ['pipe', 'pipe', 'pipe'],  // 三个pipe：指的是标准输入、标准输出、标准错误输出都通过管道传递
             env: { ...process.env, ...this.env }   // 主进程环境变量传给子进程，用于访问环境变量
         })
@@ -36,7 +42,23 @@ export class MCPClient {
             console.error(` [MCP] 进程启动失败：${error.message}`);
         })
 
-        this.process.stderr?.on('data', () => { });
+        // 收集 stderr，便于子进程异常退出时排查原因
+        let stderrBuf = '';
+        this.process.stderr?.on('data', (d: Buffer) => {
+            stderrBuf += d.toString();
+        })
+
+        // 子进程异常退出时，立即 reject 所有 pending 请求
+        // 避免子进程已死但 Promise 仍在等 stdout，最终变成 15 秒假超时
+        this.process.on('exit', (code, signal) => {
+            if (code === 0 && !signal) return;
+            const err = new Error(
+                ` [MCP] 子进程异常退出 (code=${code} sig=${signal})` +
+                (stderrBuf ? `\n${stderrBuf.trim().slice(-500)}` : '')
+            )
+            for (const p of this.pending.values()) p.reject(err);
+            this.pending.clear();
+        })
 
         this.rl = createInterface({
             input: this.process.stdout!,

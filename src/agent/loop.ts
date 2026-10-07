@@ -1,10 +1,11 @@
 import { streamText, type ModelMessage } from "ai";
 import { detect, resetHistory, recordCall, recordResult } from './loop-detection.js'
 import { isRetryable, calculateDelay, sleep } from './retry.js'
-import { ToolRegistry } from '../tools/tool-registry.js'
+import { ToolRegistry } from '../tools/registry.js'
 
 const MAX_STEPS = 15; // 最大循环次数
 const MAX_RETRIES = 3; // 最大重试次数
+const TOKEN_BUDGET = 50000 // token 预算
 
 export interface BudgetState {
     used: number
@@ -15,10 +16,10 @@ export async function agentLoop(
     model: any,
     registry: ToolRegistry,
     messages: ModelMessage[],
-    system: string,
-    budget: BudgetState
+    system: string
 ) {
     let step = 0;
+    let totalTokens = 0  // 总token数
 
     resetHistory();  // 重置工具执行的历史记录
 
@@ -108,12 +109,13 @@ export async function agentLoop(
         // Token 预算追踪：记录当前这轮的token用量 (输入+输出 的token计算已经在 streamText 中做了)
         const inp = typeof stepUsage?.inputTokens === 'number' ? stepUsage.inputTokens : ((stepUsage?.inputTokens as any)?.total ?? 0);
         const out = typeof stepUsage?.outputTokens === 'number' ? stepUsage.outputTokens : ((stepUsage?.outputTokens as any)?.total ?? 0);
-        budget.used += inp + out;
-        const pct = Math.round((budget.used / budget.limit) * 100);
-        console.log(` [Token 预算] 已使用 ${budget.used} / ${budget.limit}，(${pct}%)`);
+        
+        totalTokens += inp + out;
+        const pct = Math.round((totalTokens / TOKEN_BUDGET) * 100)
+        console.log(` [Token 预算] 已使用 ${totalTokens} / ${TOKEN_BUDGET}，(${pct}%)`)
 
         // 检查是否超过预算
-        if (budget.used > budget.limit) {
+        if (totalTokens > TOKEN_BUDGET) {
             console.log('\n [Token 预算耗尽，强制停止]');
             break;
         }
