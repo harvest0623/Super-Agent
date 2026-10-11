@@ -10,6 +10,7 @@ import { agentLoop, type BudgetState } from './agent/loop.js'
 import { MCPClient } from './tools/mcp-client.js'
 import { SessionStore } from './session/store.js'
 import { PromptBuilder, coreRules, toolGuide, deferredTools, sessionContext, type PromptContext } from './context/prompt-builder.js'
+import { estimateTokens, microcompact, summarize } from './context/compressor.js'
 
 
 const qwen = createOpenAI({  // 创建 OpenAI 模型, 用于生成文本
@@ -105,6 +106,27 @@ async function main() {
 
     const SYSTEM = builder.build(promptCtx);
     builder.debug(promptCtx);
+
+    // 启动时压缩
+    const beforeToken = estimateTokens(messages);
+    console.log(`[\n压缩前] ${messages.length} 条消息, ~ ${beforeToken} 个 token`);
+
+    const mc = microcompact(messages);
+    messages = mc.messages;
+    const afterMCToken = estimateTokens(messages);
+    console.log(`[Layer 1: Microcompact] 清理了 ${mc.cleared} 条工具调用结果, ~ ${afterMCToken} 个 token`);
+
+    let summary = '';
+    const compResult = await summarize(model, messages, summary);
+    messages = compResult.messages;
+    summary = compResult.summary;
+    const afterSumToken = estimateTokens(messages);
+    if (compResult.compressedCount > 0) {
+        console.log(`[Layer 2: Summarize] 压缩了 ${compResult.compressedCount} 条消息, ~ ${afterSumToken} 个 token`);
+        console.log(`[摘要预览] ${summary.slice(0, 150)}...`);
+    } else {
+        console.log('[Layer 2: Summarize] 未触发摘要压缩');
+    }
 
     const rl = createInterface({   // 创建 readline 接口, 用于从命令行读取用户输入
         input: process.stdin,
