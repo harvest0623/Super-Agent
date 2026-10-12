@@ -11,6 +11,8 @@ import { MCPClient } from './tools/mcp-client.js'
 import { SessionStore } from './session/store.js'
 import { PromptBuilder, coreRules, toolGuide, deferredTools, sessionContext, type PromptContext } from './context/prompt-builder.js'
 import { estimateTokens, microcompact, summarize } from './context/compressor.js'
+import { estimateMessageTokens, applyDefense, TokenTracker } from './context/defense.js'
+import { textToolResultOutput } from './context/tool-result-output.js'
 
 
 const qwen = createOpenAI({  // 创建 OpenAI 模型, 用于生成文本
@@ -80,10 +82,13 @@ async function main() {
     const isContinue = process.argv.includes('--continue');
     const sessionId = 'default';
     const store = new SessionStore(sessionId);
+    const timestamps = new Map<number, number>()
+    const tokenTracker = new TokenTracker()  // 用于跟踪token用量
 
     let messages: ModelMessage[] = []
     if (isContinue && store.exists()) {
         messages = store.load();
+        tokenTracker.addMessages(messages)  // 更新tokenTracker
         console.log(`[Session] 恢复会话，共 ${messages.length} 条历史消息`);
     } else {
         console.log(`[Session] 新会话`);
@@ -107,26 +112,40 @@ async function main() {
     const SYSTEM = builder.build(promptCtx);
     builder.debug(promptCtx);
 
-    // 启动时压缩
-    const beforeToken = estimateTokens(messages);
-    console.log(`[\n压缩前] ${messages.length} 条消息, ~ ${beforeToken} 个 token`);
+    // 压缩的三层防御
+    const beforeTokens = estimateMessageTokens(messages)
+    console.log(`\n=== 三层即时防线 ===`);
+    console.log(`[\n防线前] ${messages.length} 条消息, ~ ${beforeTokens} 个 token`);
 
-    const mc = microcompact(messages);
-    messages = mc.messages;
-    const afterMCToken = estimateTokens(messages);
-    console.log(`[Layer 1: Microcompact] 清理了 ${mc.cleared} 条工具调用结果, ~ ${afterMCToken} 个 token`);
+    const defense = applyDefense(messages, timestamps)
+    tokenTracker.replaceMessages(messages, defense.messages)
+    messages = defense.messages  // 被压缩后的消息
+    console.log(`[Layer 2: 截断] ${defense.truncated} 个超长结果被截断`);
+    console.log(`[Layer 3: TTL] ${defense.softPruned} 个软修剪, ${defense.hardPruned} 个硬修剪`);
+    console.log(`[防线后] ${messages.length} 条消息, ~${defense.tokenEstimate} tokens （节省了${beforeTokens - defense.tokenEstimate}）`);
 
-    let summary = '';
-    const compResult = await summarize(model, messages, summary);
-    messages = compResult.messages;
-    summary = compResult.summary;
-    const afterSumToken = estimateTokens(messages);
-    if (compResult.compressedCount > 0) {
-        console.log(`[Layer 2: Summarize] 压缩了 ${compResult.compressedCount} 条消息, ~ ${afterSumToken} 个 token`);
-        console.log(`[摘要预览] ${summary.slice(0, 150)}...`);
-    } else {
-        console.log('[Layer 2: Summarize] 未触发摘要压缩');
-    }
+    console.log(tokenTracker.status);  // 是否需要触发摘要压缩
+
+    // // 启动时压缩
+    // const beforeToken = estimateTokens(messages)
+    // console.log(`[\n压缩前] ${messages.length} 条消息, ~ ${beforeToken} 个 token`);
+
+    // const mc = microcompact(messages)
+    // messages = mc.messages
+    // const afterMCToken = estimateTokens(messages)
+    // console.log(`[Layer 1: Microcompact] 清理了 ${mc.cleared} 条工具调用结果, ~ ${afterMCToken} 个 token`);
+
+    // let summary = ''
+    // const compResult = await summarize(model, messages, summary)
+    // messages = compResult.messages
+    // summary = compResult.summary
+    // const afterSumToken = estimateTokens(messages)
+    // if (compResult.compressedCount > 0) {
+    //     console.log(`[Layer 2: Summarize] 压缩了 ${compResult.compressedCount} 条消息, ~ ${afterSumToken} 个 token`);
+    //     console.log(`[摘要预览] ${summary.slice(0, 150)}...`);
+    // } else {
+    //     console.log('[Layer 2: Summarize] 未触发摘要压缩');
+    // }
 
     const rl = createInterface({   // 创建 readline 接口, 用于从命令行读取用户输入
         input: process.stdin,

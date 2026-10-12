@@ -72,8 +72,8 @@ function countMessagesChars(messages: ModelMessage[]): number {
     return chars;
 }
 
-export function estimateMessageTokens(message: ModelMessage): number {
-    const chars = countMessageChars(message);  // 这条消息的字符数
+export function estimateMessageTokens(messages: ModelMessage[]): number {
+    const chars = countMessagesChars(messages);  // 这条消息的字符数
     return Math.ceil((chars / 4) * 1.2);  // 1.2x 中文安全系数  
 }
 
@@ -145,4 +145,124 @@ export function truncateToolResult(
         }
     }
     return { messages: result, truncated, compacted };
+}
+
+// 3 ----------------------------------
+export interface PruneResult {
+    messages: ModelMessage[];
+    softPruned: number;
+    hardPruned: number;
+}
+
+interface TTLConfig {
+    softTTLMs: number;
+    hardTTLMs: number;
+    keepHeadTail: number;
+}
+
+const DEFAULT_TTL: TTLConfig = {
+    softTTLMs: 5 * 60 * 1000,
+    hardTTLMs: 10 * 60 * 1000,
+    keepHeadTail: 1500,
+}
+
+
+// 5分钟之前的工具结果做软修剪，10分钟之前的工具结果做硬修剪
+export function ttlPrune(
+    messages: ModelMessage[],
+    timestamp: Map<number, number>,
+    config: TTLConfig = DEFAULT_TTL
+): PruneResult {
+    const now = Date.now();
+    let softPruned = 0;
+    let hardPruned = 0;
+
+    const result = messages.map((msg, idx) => {
+        // 只修剪角色为 tool的消息
+        if (msg.role !== 'tool' || !Array.isArray(msg.content)) return msg;
+
+        const ts = timestamp.get(idx);  // 这条消息的 timestamp
+        if (!ts) return msg;
+
+        const age = now - ts;
+
+        // 出错的工具调用，不修剪
+        const outputText = (msg.content as any[])
+            .map((p: any) => p.output ? toolResultOutputToText(p.output) as string : '')
+            .join('');
+
+        const isError = /error|失败|不存在|denied|refused|timeout/i.test(outputText);
+        if (isError) return msg;
+
+        // 10 分钟之前...
+        if (age >= config.hardTTLMs) {
+            hardPruned++;
+            const toolName = (msg.content[0] as any)?.toolName || 'unknown';
+            return {
+                ...msg,
+                content: (msg.content as any[]).map((p: any) => ({
+                    ...p,
+                    output: textToolResultOutput(`[tool result expired: ${toolName}]`),
+                })),
+            }
+        }
+
+        // 5 分钟之前...
+        if (age >= config.softTTLMs) {
+            const newContent = msg.content.map((part: any) => {
+                if (!part.output) return part;
+                const outputText = toolResultOutputToText(part.output) as string;
+                if (outputText.length <= config.keepHeadTail * 2) return part;
+
+                softPruned++;
+                const head = outputText.slice(0, config.keepHeadTail)
+                const tail = outputText.slice(-config.keepHeadTail)
+                const removed = outputText.length - config.keepHeadTail * 2;
+
+                return {
+                    ...part,
+                    output: textToolResultOutput(`${head}\n\n[soft pruned: ${removed} chars removed, content older than ${Math.round(config.softTTLMs / 60000)} min]\n\n${tail}`),
+                }
+
+            })
+            return { ...msg, content: newContent }
+        }
+        return msg;
+    });
+    return { messages: result, softPruned, hardPruned };
+}
+
+// 合并所有的防御手段
+export interface DefenseResult {
+    messages: ModelMessage[];
+    tokenEstimate: number;
+    truncated: number;
+    compacted: number;
+    softPruned: number;
+    hardPruned: number;
+}
+
+export function applyDefense(
+    messages: ModelMessage[],
+    timestamps: Map<number, number>,
+): DefenseResult {
+    // Layer 2: truncate oversized tool results
+    const trunc = truncateToolResult(messages);
+    let result = trunc.messages;
+
+    // Layer 3: TTL prune old tool results
+    const prune = ttlPrune(result, timestamps);
+    result = prune.messages;
+
+    // Layer 1: estimate final token count
+    const tokenEstimate = estimateMessageTokens(result);
+
+    return {
+        messages: result,
+        tokenEstimate,
+        truncated: trunc.truncated,
+        compacted: trunc.compacted,
+        softPruned: prune.softPruned,
+        hardPruned: prune.hardPruned,
+    };
 }
