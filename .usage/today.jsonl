@@ -1,0 +1,11 @@
+{"ts":1791782429740,"model":"qwen3.8-27b","cost":0,"inputTokens":1981,"outputTokens":79,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1791782677336,"model":"qwen3.8-27b","cost":0,"inputTokens":2506,"outputTokens":17570,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1791782688577,"model":"qwen3.8-27b","cost":0,"inputTokens":2971,"outputTokens":530,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1791782774810,"model":"qwen3.8-27b","cost":0,"inputTokens":3472,"outputTokens":5166,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1791782776831,"model":"qwen3.8-27b","cost":0,"inputTokens":4146,"outputTokens":71,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1791782855193,"model":"qwen3.8-27b","cost":0,"inputTokens":6349,"outputTokens":4637,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1791782862501,"model":"qwen3.8-27b","cost":0,"inputTokens":7521,"outputTokens":371,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1791783005375,"model":"qwen3.8-27b","cost":0,"inputTokens":7667,"outputTokens":45,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1791783074217,"model":"qwen3.8-27b","cost":0,"inputTokens":8194,"outputTokens":3721,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1791783076187,"model":"qwen3.8-27b","cost":0,"inputTokens":8318,"outputTokens":79,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1791783084096,"model":"qwen3.8-27b","cost":0,"inputTokens":8988,"outputTokens":333,"cacheReadTokens":0,"cacheWriteTokens":0}

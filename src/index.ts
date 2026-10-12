@@ -12,7 +12,7 @@ import { SessionStore } from './session/store.js'
 import { PromptBuilder, coreRules, toolGuide, deferredTools, sessionContext, type PromptContext } from './context/prompt-builder.js'
 import { estimateTokens, microcompact, summarize } from './context/compressor.js'
 import { estimateMessageTokens, applyDefense, TokenTracker } from './context/defense.js'
-import { textToolResultOutput } from './context/tool-result-output.js'
+import { UsageTracker } from './usage/tracker.js'
 
 
 const qwen = createOpenAI({  // 创建 OpenAI 模型, 用于生成文本
@@ -43,6 +43,9 @@ const toolSearchTool: ToolDefinition = {
     },
 }
 registry.register(toolSearchTool);
+
+// 成本跟踪
+const tracker = new UsageTracker('.usage/today.jsonl')
 
 // 连接MCP服务器
 async function connectMCP() {
@@ -166,11 +169,11 @@ async function main() {
             store.append(userMsg);
 
             const beforeLen = messages.length;
-            await agentLoop(model, registry, messages, SYSTEM);
+            await agentLoop(model, registry, messages, SYSTEM, tracker);
 
             // 持久化本轮新增加的消息 （包含Agent Loop 中会往messages里面push的消息）
-            const newMessages = messages.slice(beforeLen)
-            store.appendAll(newMessages)  // 追加的只有AgentLoop产生的消息
+            const newMessages = messages.slice(beforeLen);
+            store.appendAll(newMessages);  // 追加的只有AgentLoop产生的消息
 
             ask();
         });
