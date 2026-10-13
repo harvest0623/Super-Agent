@@ -4,9 +4,9 @@ import { isRetryable, calculateDelay, sleep } from './retry.js'
 import { ToolRegistry } from '../tools/registry.js'
 import { type UsageTracker, normalizeUsage } from '../usage/tracker.js'
 
-const MAX_STEPS = 15; // 最大循环次数
+const MAX_STEPS = 50; // 最大循环次数
 const MAX_RETRIES = 3; // 最大重试次数
-const TOKEN_BUDGET = 50000 // token 预算
+const TOKEN_BUDGET = 500000; // token 预算
 
 export interface BudgetState {
     used: number
@@ -21,7 +21,7 @@ export async function agentLoop(
     tracker: UsageTracker
 ) {
     let step = 0;  // 当前这轮的循环次数
-    let totalTokens = 0  // 总token数
+    let totalTokens = 0;  // 总token数
 
     resetHistory();  // 重置工具执行的历史记录
 
