@@ -21,9 +21,13 @@ import { memoryCommands } from './commands/memory.js'
 import { contextCommands } from './commands/context.js'
 import { ragCommands } from './commands/rag.js'
 import { createMemoryTool } from './tools/memory-tools.js'
-import { VectorStore } from './rag/store.js'
+// import { VectorStore } from './rag/store.js'
+import { SqliteVectorStore } from './rag/sqlite-store.js'
 import { createDashScopeEmbedder, embed } from './rag/embedder.js'
 import { createRagTools } from './tools/rag-tools.js'
+import { ragContext, memoryContext } from './context/prompt-pipes.js'
+import fs from 'node:fs';
+import { chunkDocument } from './rag/chunker.js'
 
 
 // 创建 OpenAI 模型, 用于生成文本
@@ -85,7 +89,8 @@ const dispatch = createDispatcher([
 ])
 
 // ------------------- RAG ------------------------
-const vectorStore = new VectorStore();
+// const vectorStore = new VectorStore();
+const vectorStore = new SqliteVectorStore('knowledge.db')
 const embedFn = createDashScopeEmbedder(process.env.DASHSCOPE_API_KEY as string);
 registry.register(...createRagTools(vectorStore, embedFn));
 
@@ -103,7 +108,8 @@ async function main() {
         .pipe('coreRules', coreRules())
         .pipe('toolGuide', toolGuide())
         .pipe('deferredTools', deferredTools())
-        .pipe('memoryContext', () => memoryStore.buildPromptSection())  // 在历史消息中挑选有价值的上下文
+        .pipe('memoryContext', memoryContext(memoryStore))  // 在历史消息中挑选有价值的上下文
+        .pipe('ragContext', ragContext(vectorStore))
         .pipe('sessionContext', sessionContext());
 
     function makePromptCtx(): PromptContext {
@@ -174,6 +180,25 @@ async function main() {
     console.log(` 已加载 ${memoryStore.list().length} 条历史记忆`);
     console.log('');
 
+    if (fs.existsSync('docs')) {
+        const files = fs.readdirSync('docs').filter(f => f.endsWith('.md'));
+        if (files.length > 0) {
+            console.log(` 发现 ${files.length} 个文档， 自动导入知识库...`);
+            for (const f of files) {
+                const path = `docs/${f}`;
+                const text = fs.readFileSync(path, 'utf-8');
+                const chunks = chunkDocument(path, text);
+                const embeddings = await embed(embedFn, chunks.map(c => c.text));
+                const items = chunks.flatMap((c, i) => {
+                    const embedding = embeddings[i];
+                    return embedding ? [{ chunk: c, embedding }] : [];
+                });
+                vectorStore.addBatch(items);
+                console.log(`  ${f} -> ${chunks.length} 个片段`);
+            }
+            console.log(` 知识库准备就绪， 共 ${vectorStore.size()} 个片段\n`);
+        }
+    }
     ask();
 }
 main().catch(console.error);
