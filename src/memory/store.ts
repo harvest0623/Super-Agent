@@ -12,6 +12,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { lintAll, type ValidationReport } from './validator.js';
 
 export interface MemoryEntry {
     name: string;
@@ -19,6 +20,8 @@ export interface MemoryEntry {
     type: 'user' | 'feedback' | 'project' | 'reference';
     content: string;
     filePath: string;
+    lastReadAt?: number;
+    lastWriteAt?: number;
 }
 
 const MEMORY_DIR = '.memory';  // 默认记忆目录名
@@ -152,7 +155,7 @@ export class MemoryStore {
         return true;
     }
 
-    buildPromptSection(): string {
+    buildPromptSection(): string {  // 负责将记忆系统中的内容提取出来构建到系统提示词中
         this.init();
         const index = this.loadIndex();
         const entries = this.list();
@@ -167,8 +170,10 @@ export class MemoryStore {
             '记忆索引：',
             index,
             '',
-            '使用 memory 工具的 read 操作来读取具体记忆内容。',
-            '记忆是线索，不是事实——使用前先验证其准确性。',
+            '记忆使用原则：',
+            '- 记忆是线索，不是事实——使用前先用工具验证（read_file、 grep确认）',
+            '- 不存代码能推导的、git 能差的、文档已经写了的',
+            '- 只存对话中出现的、其他地方推导不出来的信息',
         ];
         return lines.join('\n');
     }
@@ -196,5 +201,10 @@ export class MemoryStore {
             type: meta.type as MemoryEntry['type'],
             content: (match[2] ?? '').trim(),
         };
+    }
+
+    // 记忆体检
+    lint(): ValidationReport[] {
+        return lintAll(this.list(), this.baseDir);
     }
 }

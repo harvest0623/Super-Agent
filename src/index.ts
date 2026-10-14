@@ -20,6 +20,7 @@ import { debugCommands } from './commands/debug.js'
 import { memoryCommands } from './commands/memory.js'
 import { contextCommands } from './commands/context.js'
 import { ragCommands } from './commands/rag.js'
+import { dreamCommands } from './commands/dream.js'
 import { createMemoryTool } from './tools/memory-tools.js'
 // import { VectorStore } from './rag/store.js'
 import { SqliteVectorStore } from './rag/sqlite-store.js'
@@ -86,6 +87,7 @@ const dispatch = createDispatcher([
     ...memoryCommands,
     ...contextCommands,
     ...ragCommands,
+    ...dreamCommands,
 ])
 
 // ------------------- RAG ------------------------

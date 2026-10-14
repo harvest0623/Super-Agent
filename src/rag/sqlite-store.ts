@@ -57,11 +57,14 @@ export class SqliteVectorStore {
             .run(chunk.id, chunk.text, chunk.source, chunk.index,
                 JSON.stringify(embedding), now);
 
-        this.db.prepare(`INSERT OR REPLACE INTO chunks_vec (id, embedding)
+        // vec0 / fts5 虚拟表不支持 INSERT OR REPLACE，需先删后插保证幂等
+        this.db.prepare(`DELETE FROM chunks_vec WHERE id = ?`).run(chunk.id);
+        this.db.prepare(`INSERT INTO chunks_vec (id, embedding)
       VALUES (?, ?)`)
             .run(chunk.id, Buffer.from(new Float32Array(embedding).buffer));
 
-        this.db.prepare(`INSERT OR REPLACE INTO chunks_fts (id, text, source)
+        this.db.prepare(`DELETE FROM chunks_fts WHERE id = ?`).run(chunk.id);
+        this.db.prepare(`INSERT INTO chunks_fts (id, text, source)
       VALUES (?, ?, ?)`)
             .run(chunk.id, chunk.text, chunk.source);
     }
@@ -75,14 +78,16 @@ export class SqliteVectorStore {
 
     vectorSearch(queryEmbedding: number[], topK: number): Array<{ chunk: StoredChunk; score: number }> {
         const buf = Buffer.from(new Float32Array(queryEmbedding).buffer);
+        // vec0 的 KNN 查询在 prepare 阶段校验，LIMIT 必须是字面量，不能是绑定参数
+        const limit = Math.max(1, Math.floor(topK));
         const rows = this.db.prepare(`
-      SELECT v.id, v.distance, c.text, c.source, c.chunk_index, c.embedding
-      FROM chunks_vec v
-      JOIN chunks c ON c.id = v.id
-      WHERE v.embedding MATCH ?
-      ORDER BY v.distance
-      LIMIT ?
-    `).all(buf, topK) as any[];
+            SELECT v.id, v.distance, c.text, c.source, c.chunk_index, c.embedding
+            FROM chunks_vec v
+            JOIN chunks c ON c.id = v.id
+            WHERE v.embedding MATCH ?
+            ORDER BY v.distance
+            LIMIT ${limit}
+        `).all(buf) as any[];
 
         return rows.map(r => ({
             chunk: {
