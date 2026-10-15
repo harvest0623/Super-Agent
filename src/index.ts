@@ -29,6 +29,8 @@ import { createRagTools } from './tools/rag-tools.js'
 import { ragContext, memoryContext } from './context/prompt-pipes.js'
 import fs from 'node:fs';
 import { chunkDocument } from './rag/chunker.js'
+import { SkillLoader } from './skills/loader.js'
+import { createSkillCommands } from './commands/skill.js'
 
 
 // 创建 OpenAI 模型, 用于生成文本
@@ -37,7 +39,7 @@ const qwen = createOpenAI({
     apiKey: process.env.DASHSCOPE_API_KEY ?? '',
 })
 
-const model = process.env.DASHSCOPE_API_KEY ? qwen.chat('qwen3.8-27b') : createMockModel();
+const model = process.env.DASHSCOPE_API_KEY ? qwen.chat('qwen3.7-flash-2026-07-15') : createMockModel();
 
 // ---------------- 注册工具 ------------------------
 const registry = new ToolRegistry();
@@ -81,6 +83,11 @@ const memoryStore = new MemoryStore('.');
 memoryStore.init();
 registry.register(createMemoryTool(memoryStore));
 
+// ------------------- Skills ------------------------
+const skillLoader = new SkillLoader();  // skill 加载器
+const loadedSkills = skillLoader.load();
+const activeSkills = new Set<string>();
+
 // ------------------- Command ------------------------
 const dispatch = createDispatcher([
     ...debugCommands,
@@ -88,11 +95,12 @@ const dispatch = createDispatcher([
     ...contextCommands,
     ...ragCommands,
     ...dreamCommands,
+    ...createSkillCommands(skillLoader, activeSkills),
 ])
 
 // ------------------- RAG ------------------------
 // const vectorStore = new VectorStore();
-const vectorStore = new SqliteVectorStore('knowledge.db')
+const vectorStore = new SqliteVectorStore('knowledge.db');
 const embedFn = createDashScopeEmbedder(process.env.DASHSCOPE_API_KEY as string);
 registry.register(...createRagTools(vectorStore, embedFn));
 
@@ -100,10 +108,10 @@ async function main() {
     await connectMCP();
 
     // Session 持久化
-    const store = new SessionStore('default')
-    let messages: ModelMessage[] = []
-    const timestamps = new Map<number, number>() // 消息索引 -> 时间戳映射
-    const tracker = new UsageTracker('.usage/today.jsonl')  // 用于跟踪token用量
+    const store = new SessionStore('default');
+    let messages: ModelMessage[] = [];
+    const timestamps = new Map<number, number>(); // 消息索引 -> 时间戳映射
+    const tracker = new UsageTracker('.usage/today.jsonl');  // 用于跟踪token用量
 
     // Prompt Pipe 组装 system prompt
     const builder = new PromptBuilder()
@@ -112,6 +120,7 @@ async function main() {
         .pipe('deferredTools', deferredTools())
         .pipe('memoryContext', memoryContext(memoryStore))  // 在历史消息中挑选有价值的上下文
         .pipe('ragContext', ragContext(vectorStore))
+        .pipe('skillContext', () => skillLoader.buildPromptSection(activeSkills))
         .pipe('sessionContext', sessionContext());
 
     function makePromptCtx(): PromptContext {
@@ -172,6 +181,10 @@ async function main() {
     console.log('Super Agent v0.11 — Memory System (type "exit" to quit)\n');
     console.log('快捷命令：');
     console.log(`  /memory            - 查看所有记忆`);
+    console.log(`  /skill             - 查看所有 Skill`);
+    console.log(`  /skill load <name> - 加载指定 Skill`);
+    console.log(`  /skill unload <name> - 卸载已激活指定 Skill`);
+    console.log(`  /code-review       - 激活并执行 code-review Skill`);
     console.log(`  /memory search     - 搜索记忆`);
     console.log(`  /context           - 终端里看 context 占用矩阵`);
     console.log(`  /usage             - 累计 token 用量和成本`);
@@ -181,6 +194,14 @@ async function main() {
     console.log('');
     console.log(` 已加载 ${memoryStore.list().length} 条历史记忆`);
     console.log('');
+
+    if (loadedSkills.length > 0) {
+        console.log(` 发现了 ${loadedSkills.length} 个 Skill`);
+        for (const s of loadedSkills) {
+            console.log(`  ${s.name} - ${s.description}`);
+        }
+        console.log('');
+    }
 
     if (fs.existsSync('docs')) {
         const files = fs.readdirSync('docs').filter(f => f.endsWith('.md'));
