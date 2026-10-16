@@ -31,6 +31,10 @@ import fs from 'node:fs';
 import { chunkDocument } from './rag/chunker.js'
 import { SkillLoader } from './skills/loader.js'
 import { createSkillCommands } from './commands/skill.js'
+import { PluginManager } from './plugins/manager.js'
+import type { PluginDefinition } from './plugins/types.js'
+import { supabasePlugin } from './plugins/supabase-plugin.js'
+import { createPluginCommands } from './commands/plugin.js'
 
 
 // 创建 OpenAI 模型, 用于生成文本
@@ -88,6 +92,12 @@ const skillLoader = new SkillLoader();  // skill 加载器
 const loadedSkills = skillLoader.load();
 const activeSkills = new Set<string>();
 
+// ------------------- Plugins ------------------------
+const pluginManager = new PluginManager(registry);
+const availablePlugins = new Map<string, PluginDefinition>([
+    ['supabase', supabasePlugin]
+])
+
 // ------------------- Command ------------------------
 const dispatch = createDispatcher([
     ...debugCommands,
@@ -96,6 +106,7 @@ const dispatch = createDispatcher([
     ...ragCommands,
     ...dreamCommands,
     ...createSkillCommands(skillLoader, activeSkills),
+    ...createPluginCommands(pluginManager, availablePlugins),
 ])
 
 // ------------------- RAG ------------------------
@@ -106,6 +117,17 @@ registry.register(...createRagTools(vectorStore, embedFn));
 
 async function main() {
     await connectMCP();
+
+    // 启动时自动加载插件
+    console.log(' 加载插件...');
+    for (const [name, def] of availablePlugins) {
+        try {
+            const tools = await pluginManager.load(def);
+            console.log(`  [plugin] ${name} 已自动加载，注册 ${tools.length} 个工具`);
+        } catch (err) {
+            console.log(`  [plugin] ${name} 自动加载失败: ${err instanceof Error ? err.message : err}`);
+        }
+    }
 
     // Session 持久化
     const store = new SessionStore('default');
@@ -142,6 +164,8 @@ async function main() {
             const trimmed = input.trim();
             if (!trimmed || trimmed === 'exit') {
                 console.log('Bye!');
+                // 关闭所有插件的连接
+                await pluginManager.unloadAll();  // 卸载所有已加载的插件
                 await registry.closeAllMCP();  // 关闭子进程的 MCP 连接
                 rl.close();
                 return;
@@ -203,25 +227,25 @@ async function main() {
         console.log('');
     }
 
-    if (fs.existsSync('docs')) {
-        const files = fs.readdirSync('docs').filter(f => f.endsWith('.md'));
-        if (files.length > 0) {
-            console.log(` 发现 ${files.length} 个文档， 自动导入知识库...`);
-            for (const f of files) {
-                const path = `docs/${f}`;
-                const text = fs.readFileSync(path, 'utf-8');
-                const chunks = chunkDocument(path, text);
-                const embeddings = await embed(embedFn, chunks.map(c => c.text));
-                const items = chunks.flatMap((c, i) => {
-                    const embedding = embeddings[i];
-                    return embedding ? [{ chunk: c, embedding }] : [];
-                });
-                vectorStore.addBatch(items);
-                console.log(`  ${f} -> ${chunks.length} 个片段`);
-            }
-            console.log(` 知识库准备就绪， 共 ${vectorStore.size()} 个片段\n`);
-        }
-    }
+    // if (fs.existsSync('docs')) {
+    //     const files = fs.readdirSync('docs').filter(f => f.endsWith('.md'));
+    //     if (files.length > 0) {
+    //         console.log(` 发现 ${files.length} 个文档， 自动导入知识库...`);
+    //         for (const f of files) {
+    //             const path = `docs/${f}`;
+    //             const text = fs.readFileSync(path, 'utf-8');
+    //             const chunks = chunkDocument(path, text);
+    //             const embeddings = await embed(embedFn, chunks.map(c => c.text));
+    //             const items = chunks.flatMap((c, i) => {
+    //                 const embedding = embeddings[i];
+    //                 return embedding ? [{ chunk: c, embedding }] : [];
+    //             });
+    //             vectorStore.addBatch(items);
+    //             console.log(`  ${f} -> ${chunks.length} 个片段`);
+    //         }
+    //         console.log(` 知识库准备就绪， 共 ${vectorStore.size()} 个片段\n`);
+    //     }
+    // }
     ask();
 }
 main().catch(console.error);

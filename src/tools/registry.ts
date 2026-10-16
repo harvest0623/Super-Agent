@@ -34,6 +34,11 @@ export class ToolRegistry {
         }
     }
 
+    unregister(name: string): void {
+        this.discoveredTools.delete(name);
+        this.tools.delete(name);
+    }
+
     async registerMCPServer(serverName: string, client: MCPClient): Promise<string[]> {   // 注册 MCP 服务中的工具
         await client.connect();  // 连接 MCP 服务器
         this.mcpClients.push(client);  // 存储 MCP 服务器连接

@@ -15,7 +15,8 @@ export const PRICE_TABLE: Record<string, ModelPricing> = {
     'gpt-5': { input: 1.25, output: 10.00, cacheWrite: 1.25, cacheRead: 0.125 },
     'deepseek-v4-pro': { input: 9.00, output: 27.00, cacheWrite: 1.80, cacheRead: 0.30 },
     'qwen3.8-max': { input: 2.00, output: 6.00, cacheWrite: 2.50, cacheRead: 0.25 },
-    'qwen3.8-flash': { input: 0.15, output: 0.47, cacheWrite: 0.23, cacheRead: 0.018 }
+    'qwen3.8-flash': { input: 0.15, output: 0.47, cacheWrite: 0.23, cacheRead: 0.018 },
+    'mock-model': { input: 0, output: 0, cacheWrite: 0, cacheRead: 0 },
 };
 
 
