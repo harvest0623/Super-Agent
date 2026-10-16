@@ -35,6 +35,8 @@ import { PluginManager } from './plugins/manager.js'
 import type { PluginDefinition } from './plugins/types.js'
 import { supabasePlugin } from './plugins/supabase-plugin.js'
 import { createPluginCommands } from './commands/plugin.js'
+import { createSecurityCommands } from './commands/security.js'
+import { HookPipeline } from './security/hook.js'
 
 
 // 创建 OpenAI 模型, 用于生成文本
@@ -98,6 +100,29 @@ const availablePlugins = new Map<string, PluginDefinition>([
     ['supabase', supabasePlugin]
 ])
 
+// ------------------- Hook --------------------------
+const hookPipeline = new HookPipeline()
+// pre hook 示例
+hookPipeline.registerPre('audit-log', (toolName, input) => {
+    if (toolName === 'write_file' || toolName === 'edit_file') {
+        const path = (input as any)?.path || 'unknown'
+        console.log(` [audit] 文件写入操作： ${toolName} -> ${path}`);
+    }
+    return { action: 'allow' }
+})
+// post hook 示例
+hookPipeline.registerPost('bash-timestamp', (toolName, _input, output) => {
+    if (toolName === 'bash') {
+        const timestamp = new Date().toISOString()
+        return {
+            action: 'modify',
+            modifiedOutput: `[${timestamp}] \n${output}`
+        }
+    }
+    return { action: 'allow' }
+})
+registry.setHookPipeline(hookPipeline)
+
 // ------------------- Command ------------------------
 const dispatch = createDispatcher([
     ...debugCommands,
@@ -107,6 +132,7 @@ const dispatch = createDispatcher([
     ...dreamCommands,
     ...createSkillCommands(skillLoader, activeSkills),
     ...createPluginCommands(pluginManager, availablePlugins),
+    ...createSecurityCommands(registry, hookPipeline),
 ])
 
 // ------------------- RAG ------------------------

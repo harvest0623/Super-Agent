@@ -1,5 +1,8 @@
 import { jsonSchema } from "ai";
 import type { MCPClient } from './mcp-client.js';
+import { canUseTool, type Role } from '../security/roles.js'
+import { classifyBashCommand } from '../security/bash-classifier.js'
+import type { HookPipeline } from '../security/hook.js'
 
 export interface ToolDefinition {
     name: string;
@@ -28,10 +31,28 @@ export class ToolRegistry {
     // 已发现的工具列表
     private discoveredTools = new Set<string>()  // 已发现的工具列表，用于避免重复注册
 
+    // 当前角色
+    private currentRole: Role = 'owner'
+    private hookPipeline?: HookPipeline
+
     register(...tools: ToolDefinition[]): void { // 将来在任何地方定义的工具，都直接通过register方法注册，被存入tools列表
         for (const tool of tools) {
             this.tools.set(tool.name, tool);
         }
+    }
+
+    // 切换权限角色
+    setRole(role: Role): void {
+        this.currentRole = role;
+    }
+
+    getRole(): Role {
+        return this.currentRole;
+    }
+
+    // hook 管线
+    setHookPipeline(pipeline: HookPipeline): void {
+        this.hookPipeline = pipeline;
     }
 
     unregister(name: string): void {
@@ -133,11 +154,35 @@ export class ToolRegistry {
             const executeFn = tool.execute;
             const isSafe = tool.isConcurrencySafe === true;
             const registry = this;
+            const toolName = tool.name
+            const hookPipeline = registry.hookPipeline
 
             result[tool.name] = {
                 description: tool.description,
                 inputSchema: jsonSchema(tool.parameters as any),
                 execute: async (input: any) => {
+                    // Bash 风险检测
+                    if (toolName === 'bash' && input?.command) {
+                        const risk = classifyBashCommand(input.command)
+                        if (risk.level === 'dangerous') {
+                            return `[拒绝执行] 检测到危险操作：${risk.reason}\n命令：${input.command}`
+                        }
+                        if (risk.level === 'moderate') {
+                            console.log(`  [安全警告] 操作：${risk.reason}\n命令：${input.command}`)
+                        }
+                    }
+
+                    // pre hook
+                    if (hookPipeline) {
+                        const preResult = await hookPipeline.runPre(toolName, input)
+                        if (preResult.action === 'block') {
+                            return `[Hook 拦截] ${preResult.reason || '操作被阻止'}`
+                        }
+                        if (preResult.action === 'modify' && preResult.modifiedInput !== undefined) {
+                            input = preResult.modifiedInput
+                        }
+                    }
+
                     // 在真正执行前，先按 isConcurrencySafe 来获取锁
                     if (isSafe) {
                         await registry.acquireConcurrent();
@@ -150,7 +195,15 @@ export class ToolRegistry {
                     try {
                         const raw = await executeFn(input);
                         const text = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
-                        return truncateResult(text, maxChars);
+                        let output = truncateResult(text, maxChars);
+                        // Post Hook
+                        if (hookPipeline) {
+                            const postResult = await hookPipeline.runPost(toolName, input, output);
+                            if (postResult.modifiedOutput !== undefined) {
+                                output = String(postResult.modifiedOutput);
+                            }
+                        }
+                        return output;
                     } finally {
                         // 无论是否成功，都释放锁
                         if (isSafe) {
@@ -186,6 +239,9 @@ export class ToolRegistry {
     getActiveTools(): ToolDefinition[] {
         return this.getAll().filter(tool => {
             if (tool.shouldDefer && !this.discoveredTools.has(tool.name)) {
+                return false;
+            }
+            if (!canUseTool(this.currentRole, tool.name)) {
                 return false;
             }
             return true;
