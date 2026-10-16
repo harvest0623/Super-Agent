@@ -78,3 +78,6 @@
 {"ts":1792139575323,"model":"qwen3.7-flash-2026-07-15","cost":0,"inputTokens":2917,"outputTokens":74,"cacheReadTokens":0,"cacheWriteTokens":0}
 {"ts":1792139577695,"model":"qwen3.7-flash-2026-07-15","cost":0,"inputTokens":3444,"outputTokens":135,"cacheReadTokens":0,"cacheWriteTokens":0}
 {"ts":1792139579241,"model":"qwen3.7-flash-2026-07-15","cost":0,"inputTokens":3542,"outputTokens":80,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1792143817471,"model":"qwen3.8-flash","cost":0.00053549,"inputTokens":3266,"outputTokens":97,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1792144096340,"model":"qwen3.8-flash","cost":0.00056527,"inputTokens":3358,"outputTokens":131,"cacheReadTokens":0,"cacheWriteTokens":0}
+{"ts":1792144098461,"model":"qwen3.8-flash","cost":0.000585,"inputTokens":3477,"outputTokens":135,"cacheReadTokens":0,"cacheWriteTokens":0}

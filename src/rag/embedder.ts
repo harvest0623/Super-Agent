@@ -27,6 +27,21 @@ export function createDashScopeEmbedder(apiKey: string): EmbeddingFn {
     };
 }
 
+// 无 API Key 时使用的本地 Mock：根据文本生成确定性伪向量，便于离线开发调试
+export function createMockEmbedder(): EmbeddingFn {
+    return async (texts: string[]) => {
+        return texts.map(text => {
+            const vec = new Array<number>(DIMS).fill(0);
+            for (let i = 0; i < text.length; i++) {
+                const dim = text.charCodeAt(i) % DIMS;
+                vec[dim] = (vec[dim] ?? 0) + 1;
+            }
+            // L2 归一化，使其可直接用于余弦相似度计算
+            const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0)) || 1;
+            return vec.map(v => v / norm);
+        });
+    };
+}
 
 // 相同的文本没必要重复做向量处理
 const embedCache = new Map<string, number[]>();
