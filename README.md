@@ -1,8 +1,14 @@
+# 🤖 Super-Agent（生产级 AI Agent）
+
+<div align="center">
+
 [![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=3178C6)](https://www.typescriptlang.org/) [![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=nodedotjs&logoColor=339933)](https://nodejs.org/) [![AI SDK](https://img.shields.io/badge/AI_SDK-7.x-000000?logo=vercel&logoColor=000000)](https://sdk.vercel.ai/) [![SQLite](https://img.shields.io/badge/SQLite-3-003B57?logo=sqlite&logoColor=003B57)](https://www.sqlite.org/) [![Zod](https://img.shields.io/badge/Zod-4.x-3E67B1?logo=zod&logoColor=3E67B1)](https://zod.dev/) [![MCP](https://img.shields.io/badge/MCP-stdio-6E4AFF?logo=anthropic&logoColor=6E4AFF)](https://modelcontextprotocol.io/)
 
 **本项目使用：**
 
 [![pnpm](https://img.shields.io/badge/pnpm-12.11.2-F69220?logo=pnpm&logoColor=F69220)](https://pnpm.io/) [![AI SDK](https://img.shields.io/badge/ai-7.0.117-000000?logo=vercel&logoColor=000000)](https://sdk.vercel.ai/) [![OpenAI Compatible](https://img.shields.io/badge/%40ai--sdk%2Fopenai-4.0.78-412991?logo=openai&logoColor=412991)](https://sdk.vercel.ai/providers/ai-sdk-providers/openai) [![better-sqlite3](https://img.shields.io/badge/better--sqlite3-13.0.3-003B57?logo=sqlite&logoColor=003B57)](https://github.com/WiseLibs/better-sqlite3) [![sqlite-vec](https://img.shields.io/badge/sqlite--vec-0.1.9-4B8BBE?logo=sqlite&logoColor=4B8BBE)](https://github.com/asg017/sqlite-vec) [![Zod](https://img.shields.io/badge/zod-4.6.7-3E67B1?logo=zod&logoColor=3E67B1)](https://zod.dev/) [![Croner](https://img.shields.io/badge/croner-10.0.1-2C3E50?logo=clockify&logoColor=2C3E50)](https://github.com/hexagon/croner) [![dotenv](https://img.shields.io/badge/dotenv-18.0.4-ECD53F?logo=dotenv&logoColor=ECD53F)](https://github.com/motdotla/dotenv) [![Turndown](https://img.shields.io/badge/turndown-7.2.4-585858?logo=markdown&logoColor=585858)](https://github.com/mixmark-io/turndown)
+
+</div>
 
 > **一个从零手写的生产级 AI Agent 运行时**，把「能聊天」做到「能干活、跑不挂」。集成自主 Agent 循环、工具系统与读写锁、上下文工程、跨会话记忆、RAG、Skill / Plugin 扩展、权限与 Hook 管线、Cron 定时任务、Multi-Agent 并行等能力。
 
